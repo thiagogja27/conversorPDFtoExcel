@@ -7,6 +7,17 @@ import * as XLSX from 'xlsx';
 import type { FormState } from './types';
 
 function processExtractedText(text: string): (string[])[] {
+  const convertWeightValue = (value: string): string => {
+    if (!value) return '';
+    const cleanedValue = value.replace(/\./g, '').replace(/,/g, '.');
+    const number = parseFloat(cleanedValue);
+    if (isNaN(number)) {
+      return value; // Return original string if it's not a number
+    }
+    const finalValue = Math.round(number * 1000);
+    return finalValue.toString();
+  };
+
   const aoaData: (string[])[] = [
     ['Seq.', 'Vagão', 'Num. CT-e', 'Tara', 'TU', 'TB', 'Ticket Tara', 'Ticket TU', 'Ticket TB', 'Mercadoria', 'Data Carregamento', 'Nota Fiscal (NF)', 'Chave NFE', 'Data NF', 'Peso Total NF', 'Peso Rateio', 'Remetente NF', 'Destinatário NF']
   ];
@@ -16,7 +27,6 @@ function processExtractedText(text: string): (string[])[] {
 
   const wagonRegex = /^(\d{1,3})\.?\s+([A-Z0-9-]{6,14})\s+(.*)/s;
   const nfBoundaryRegex = /(\S+)\s+([\d\s]{40,60})\s+(\d{2}\s*[/|-]\s*\d{2}\s*[/|-]\s*\d{2,4})/g;
-
 
   for (const record of records) {
     const wagonMatch = record.match(wagonRegex);
@@ -62,9 +72,9 @@ function processExtractedText(text: string): (string[])[] {
     const numberParts = parts.slice(0, firstMerchandiseIndex);
     
     numCte = `${numberParts[0] || ''} ${numberParts[1] || ''}`.trim();
-    tara = numberParts[2] || '';
-    tu = numberParts[3] || '';
-    tb = numberParts[4] || '';
+    tara = convertWeightValue(numberParts[2] || '');
+    tu = convertWeightValue(numberParts[3] || '');
+    tb = convertWeightValue(numberParts[4] || '');
     ticketTara = numberParts[5] || '';
     ticketTu = numberParts[6] || '';
     ticketTb = numberParts[7] || '';
@@ -86,10 +96,41 @@ function processExtractedText(text: string): (string[])[] {
       const chaveNfe = finalNfMatch[2].replace(/\s/g, '');
       const dataNf = finalNfMatch[3].replace(/\s/g, '').replace(/-/g, '/');
       
-      const restOfNfLine = finalNfMatch[4].trim().split(/\s+/).filter(Boolean);
-      const pesoTotalNf = restOfNfLine[0] || '';
-      const pesoRateio = restOfNfLine[1] || '';
-      const clienteParts = restOfNfLine.slice(2);
+      let restOfNfRaw = finalNfMatch[4];
+
+      // DEFINITIVE TOLERANCE-ZERO CLEANUP:
+      // This regex finds the very first word that could belong to the footer.
+      const footerTerminator = /Tota(l)?|Qntd\. Vagões|Ticket|Recebemos este aviso|Assinatura do Agente/i;
+      const footerMatchIndex = restOfNfRaw.search(footerTerminator);
+      
+      // If a footer term is found, cut the string off right there.
+      if (footerMatchIndex !== -1) {
+        restOfNfRaw = restOfNfRaw.substring(0, footerMatchIndex);
+      }
+
+      const restOfNfLine = restOfNfRaw.trim().split(/\s+/).filter(Boolean);
+      
+      let pesoTotalNf = '';
+      let pesoRateio = '';
+      let clientStartIndex = 0;
+
+      if (restOfNfLine.length > 0) {
+        const potentialWeight1 = convertWeightValue(restOfNfLine[0]);
+        if (/^\d+$/.test(potentialWeight1)) {
+            pesoTotalNf = potentialWeight1;
+            clientStartIndex = 1;
+        }
+      }
+      
+      if (clientStartIndex === 1 && restOfNfLine.length > 1) {
+        const potentialWeight2 = convertWeightValue(restOfNfLine[1]);
+        if (/^\d+$/.test(potentialWeight2)) {
+            pesoRateio = potentialWeight2;
+            clientStartIndex = 2;
+        }
+      }
+      
+      const clienteParts = restOfNfLine.slice(clientStartIndex);
 
       const mid = Math.ceil(clienteParts.length / 2);
       const remetenteNf = clienteParts.slice(0, mid).join(' ');
