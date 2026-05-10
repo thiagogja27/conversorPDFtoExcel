@@ -118,7 +118,7 @@ function processExtractedText(text: string): (string[])[] {
 export async function convertPdf(prevState: any, formData: FormData): Promise<FormState> {
   const file = formData.get('pdf') as File;
   if (!file || file.size === 0) {
-    return { message: 'Nenhum arquivo enviado. Por favor, selecione um PDF.', downloadLink: '' };
+    return { message: 'Nenhum arquivo enviado. Por favor, selecione um PDF.' };
   }
 
   try {
@@ -126,35 +126,31 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
     const data = await pdf(buffer);
 
     if (!data.text || data.text.trim() === ''){
-        return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.', downloadLink: '' };
+      return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.' };
     }
 
     const extractedData = processExtractedText(data.text);
 
     if (extractedData.length <= 1) {
-      return { message: 'Não foi possível extrair dados estruturados do PDF. Verifique se o formato do arquivo corresponde ao esperado.', downloadLink: '' };
+      return { message: 'Não foi possível extrair dados estruturados do PDF. Verifique se o formato do arquivo corresponde ao esperado.' };
     }
 
     const ws = XLSX.utils.aoa_to_sheet(extractedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Dados');
 
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    const base64Data = (excelBuffer as Buffer).toString('base64');
     const outputFileName = `dados-${Date.now()}.xlsx`;
-    const outputPath = join(process.cwd(), 'public', outputFileName);
 
-    await writeFile(outputPath, XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' }));
+    return {
+      message: 'Arquivo processado com sucesso!',
+      fileData: base64Data,
+      fileName: outputFileName
+    };
 
-    setTimeout(async () => {
-      try {
-        await unlink(outputPath);
-      } catch (e) {
-        console.error(`Failed to delete temporary file: ${outputPath}`, e);
-      }
-    }, 60 * 1000);
-
-    return { message: 'Arquivo processado com sucesso! Clique no link para baixar.', downloadLink: `/${outputFileName}` };
   } catch (error) {
     console.error(error);
-    return { message: 'Ocorreu um erro inesperado no servidor durante o processamento do PDF.', downloadLink: '' };
+    return { message: 'Ocorreu um erro inesperado no servidor durante o processamento do PDF.' };
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { convertPdf } from './actions';
 import type { FormState } from './types';
@@ -8,7 +8,6 @@ import { Upload, Download, RefreshCw, FileSpreadsheet, Sparkles, Loader2, AlertT
 
 const initialState: FormState = {
   message: '',
-  downloadLink: ''
 };
 
 function SubmitButton() {
@@ -32,12 +31,35 @@ export default function ConverterPage() {
   const [state, formAction] = useFormState(convertPdf, initialState);
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('Nenhum arquivo selecionado');
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (state.fileData && state.fileName) {
+      const byteCharacters = atob(state.fileData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = state.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setShowSuccess(true);
+    }
+  }, [state.fileData, state.fileName]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setFileName(selectedFile.name);
+      setShowSuccess(false); // Reset success state
     }
   };
 
@@ -46,9 +68,8 @@ export default function ConverterPage() {
     setFileName('Nenhum arquivo selecionado');
     const fileInput = document.getElementById('pdf-upload') as HTMLInputElement;
     if(fileInput) fileInput.value = '';
-    // To fully reset the form state, we might need to rely on re-submission or a more complex state management.
-    // For now, this just resets the client-side file selection.
-    window.location.reload(); // Simple way to reset everything
+    setShowSuccess(false);
+    // We don't need to reload the page anymore, just reset the client state
   };
 
   return (
@@ -80,7 +101,7 @@ export default function ConverterPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-8 transition-all duration-500">
-          {!state.downloadLink ? (
+          {!showSuccess ? (
             <form action={formAction}>
               <div className="mb-6">
                 <label htmlFor="pdf-upload" className="block text-lg font-semibold text-gray-700 mb-3 text-center">1. Escolha o arquivo PDF</label>
@@ -112,30 +133,22 @@ export default function ConverterPage() {
             <div className="text-center space-y-6 py-8">
               <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto animate-pulse" />
               <div>
-                <h3 className="text-2xl font-bold text-gray-900">Conversão Concluída!</h3>
-                <p className="text-gray-600 mt-1">{state.message}</p>
+                <h3 className="text-2xl font-bold text-gray-900">Download Iniciado!</h3>
+                <p className="text-gray-600 mt-1">Seu arquivo Excel foi gerado e o download começou.</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                  <a 
-                    href={state.downloadLink}
-                    download
-                    className="w-full sm:w-auto h-12 px-8 text-lg font-semibold rounded-xl bg-green-500 text-white flex items-center justify-center gap-3 transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-100"
-                  >
-                    <Download className="w-6 h-6" />
-                    Baixar Excel
-                  </a>
                   <button 
                     onClick={handleReset}
                     className="w-full sm:w-auto h-12 px-8 text-lg font-semibold rounded-xl bg-gray-200 text-gray-700 flex items-center justify-center gap-3 transition-all duration-300 ease-in-out transform hover:bg-gray-300 active:bg-gray-400"
                   >
                     <RefreshCw className="w-5 h-5" />
-                    Novo Envio
+                    Converter Outro Arquivo
                   </button>
               </div>
             </div>
           )}
 
-          {state.message && !state.downloadLink && (
+          {state.message && !state.fileData && (
              <div className="mt-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
                 <div className="flex items-center">
                     <AlertTriangle className="h-6 w-6 text-red-600 mr-3" />
