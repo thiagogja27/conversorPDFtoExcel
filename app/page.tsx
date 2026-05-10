@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { convertPdf } from './actions';
+import type { FormState } from './types';
 import { Upload, Download, RefreshCw, FileSpreadsheet, Sparkles, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-const initialState = {
-  downloadUrl: '',
-  error: ''
+const initialState: FormState = {
+  message: '',
+  downloadLink: ''
 };
 
 function SubmitButton() {
@@ -37,19 +38,17 @@ export default function ConverterPage() {
     if (selectedFile) {
       setFile(selectedFile);
       setFileName(selectedFile.name);
-      // Reset state when a new file is selected
-      state.downloadUrl = '';
-      state.error = '';
     }
   };
 
   const handleReset = () => {
     setFile(null);
     setFileName('Nenhum arquivo selecionado');
-    state.downloadUrl = '';
-    state.error = '';
     const fileInput = document.getElementById('pdf-upload') as HTMLInputElement;
     if(fileInput) fileInput.value = '';
+    // To fully reset the form state, we might need to rely on re-submission or a more complex state management.
+    // For now, this just resets the client-side file selection.
+    window.location.reload(); // Simple way to reset everything
   };
 
   return (
@@ -81,7 +80,7 @@ export default function ConverterPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-8 transition-all duration-500">
-          {!state.downloadUrl ? (
+          {!state.downloadLink ? (
             <form action={formAction}>
               <div className="mb-6">
                 <label htmlFor="pdf-upload" className="block text-lg font-semibold text-gray-700 mb-3 text-center">1. Escolha o arquivo PDF</label>
@@ -93,10 +92,11 @@ export default function ConverterPage() {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
                     onChange={handleFileChange} 
                     accept=".pdf"
+                    required
                   />
                   <div className="w-full h-32 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-500 transition-colors duration-300 hover:border-blue-500 hover:bg-blue-50">
                     <Upload className="w-8 h-8 mb-2" />
-                    <span className="font-medium">{fileName}</span>
+                    <span className="font-medium text-center px-2">{fileName}</span>
                   </div>
                 </div>
               </div>
@@ -113,11 +113,11 @@ export default function ConverterPage() {
               <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto animate-pulse" />
               <div>
                 <h3 className="text-2xl font-bold text-gray-900">Conversão Concluída!</h3>
-                <p className="text-gray-600 mt-1">Seu arquivo Excel está pronto para download.</p>
+                <p className="text-gray-600 mt-1">{state.message}</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
                   <a 
-                    href={state.downloadUrl}
+                    href={state.downloadLink}
                     download
                     className="w-full sm:w-auto h-12 px-8 text-lg font-semibold rounded-xl bg-green-500 text-white flex items-center justify-center gap-3 transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-100"
                   >
@@ -135,13 +135,13 @@ export default function ConverterPage() {
             </div>
           )}
 
-          {state.error && (
+          {state.message && !state.downloadLink && (
              <div className="mt-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
                 <div className="flex items-center">
                     <AlertTriangle className="h-6 w-6 text-red-600 mr-3" />
                     <div>
                         <p className="font-bold text-red-800">Ocorreu um Erro</p>
-                        <p className="text-sm text-red-700">{state.error}</p>
+                        <p className="text-sm text-red-700">{state.message}</p>
                     </div>
                 </div>
             </div>

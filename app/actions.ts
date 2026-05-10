@@ -4,6 +4,7 @@ import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import pdf from 'pdf-parse';
 import * as XLSX from 'xlsx';
+import type { FormState } from './types';
 
 function processExtractedText(text: string): (string[])[] {
   const aoaData: (string[])[] = [
@@ -114,10 +115,10 @@ function processExtractedText(text: string): (string[])[] {
   return aoaData;
 }
 
-export async function convertPdf(prevState: any, formData: FormData): Promise<{ downloadUrl?: string; error?: string }> {
+export async function convertPdf(prevState: any, formData: FormData): Promise<FormState> {
   const file = formData.get('pdf') as File;
   if (!file || file.size === 0) {
-    return { error: 'Nenhum arquivo enviado. Por favor, selecione um PDF.' };
+    return { message: 'Nenhum arquivo enviado. Por favor, selecione um PDF.', downloadLink: '' };
   }
 
   try {
@@ -125,13 +126,13 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<{ 
     const data = await pdf(buffer);
 
     if (!data.text || data.text.trim() === ''){
-        return { error: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.' };
+        return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.', downloadLink: '' };
     }
 
     const extractedData = processExtractedText(data.text);
 
     if (extractedData.length <= 1) {
-      return { error: 'Não foi possível extrair dados estruturados do PDF. Verifique se o formato do arquivo corresponde ao esperado.' };
+      return { message: 'Não foi possível extrair dados estruturados do PDF. Verifique se o formato do arquivo corresponde ao esperado.', downloadLink: '' };
     }
 
     const ws = XLSX.utils.aoa_to_sheet(extractedData);
@@ -151,9 +152,9 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<{ 
       }
     }, 60 * 1000);
 
-    return { downloadUrl: `/${outputFileName}` };
+    return { message: 'Arquivo processado com sucesso! Clique no link para baixar.', downloadLink: `/${outputFileName}` };
   } catch (error) {
     console.error(error);
-    return { error: 'Ocorreu um erro inesperado no servidor durante o processamento do PDF.' };
+    return { message: 'Ocorreu um erro inesperado no servidor durante o processamento do PDF.', downloadLink: '' };
   }
 }

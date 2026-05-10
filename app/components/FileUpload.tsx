@@ -1,7 +1,7 @@
 'use client';
 
 import { useFormState } from 'react-dom';
-import { convertPdfToExcel } from '../actions';
+import { convertPdf } from '../actions';
 import type { FormState } from '../types';
 import { SubmitButton } from './SubmitButton';
 
@@ -11,7 +11,7 @@ const initialState: FormState = {
 };
 
 export function FileUpload() {
-  const [state, formAction] = useFormState<FormState, FormData>(convertPdfToExcel, initialState);
+  const [state, formAction] = useFormState<FormState, FormData>(convertPdf, initialState);
 
   return (
     <div className="w-full max-w-2xl p-6 bg-white rounded-lg shadow-md">
