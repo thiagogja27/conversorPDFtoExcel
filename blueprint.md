@@ -11,6 +11,7 @@ Esta aplicação é uma ferramenta web que permite aos usuários converter arqui
 *   **Download Direto**: Após o processamento, um link para download do arquivo `.xlsx` gerado é exibido dinamicamente na interface.
 *   **Estilo Moderno**: A aplicação utiliza TailwindCSS para um design moderno e responsivo, com um gradiente de fundo sutil e uma fonte personalizada (Inter).
 *   **Componentes Reativos**: A interface utiliza os hooks `useFormState` e `useFormStatus` do React para fornecer feedback em tempo real durante o processo de upload e conversão (ex: desabilitar o botão, exibir mensagens de erro/sucesso).
+*   **Resumo de Desmembres na Interface**: Após o processamento, a aplicação exibe um resumo claro na interface do usuário, detalhando o número total de vagões desmembrados e a contagem de ocorrências de desmembre para cada remetente (Remetente NF).
 
 ### Lógica de Extração de Dados (Motor de Processamento)
 
@@ -26,6 +27,15 @@ O motor de extração de texto em `app/actions.ts` foi reescrito para ser robust
     *   **b. Achatamento e Extração**: Em seguida, ele "achata" esse bloco em uma única linha de texto e só então extrai os dados, garantindo que todas as colunas (`Peso Rateio`, `Remetente`, `Destinatário`, etc.) sejam preenchidas corretamente.
 7.  **Formato de Saída Agrupado**: O Excel gerado apresenta os dados do vagão apenas na primeira linha da primeira NF. As NFs subsequentes para o mesmo vagão aparecem nas linhas seguintes com as células de dados do vagão em branco, criando uma visualização limpa e agrupada.
 
-## Próximos Passos
+## Plano de Implementação da Nova Funcionalidade
 
-A funcionalidade principal está completa e robusta.
+*   **Identificação de Vagões Duplicados (Desmembre)**:
+    *   **Análise na Geração de Dados**: Após a extração dos dados do PDF, a lógica principal será modificada para identificar todos os vagões que aparecem mais de uma vez no documento.
+    *   **Marcação "Desmembre"**: Para cada vagão identificado como duplicado, um novo campo ou uma anotação será adicionada aos dados para marcá-lo como "desmembre".
+    *   **Cálculo de Desmembres**: O número total de vagões desmembrados únicos será calculado.
+    *   **Contagem por Remetente**: O sistema contará quantas NFs dentro dos vagões desmembrados pertencem a cada "Remetente NF".
+    *   **Aba Resumo "Desmembres" no Excel**: O arquivo Excel gerado conterá uma nova aba chamada "Desmembres". Esta aba funcionará como um resumo, listando as seguintes colunas para a análise dos vagões duplicados: **Vagão, TB, Chave NFE, Remetente NF, Data NF, e Peso Rateio**.
+    *   **Atualização da Interface**: A interface da aplicação será ajustada para exibir claramente:
+        *   Um **quadro de resumo** acima da tabela de dados, mostrando o total de vagões desmembrados e a contagem de ocorrências por remetente.
+        *   Um **destaque visual** (fundo amarelo) nas linhas da tabela que pertencem a um vagão desmembrado.
+

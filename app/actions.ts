@@ -6,7 +6,12 @@ import pdf from 'pdf-parse';
 import * as XLSX from 'xlsx';
 import type { FormState } from './types';
 
-function processExtractedText(text: string): (string[])[] {
+function processExtractedText(text: string): { 
+  aoaData: (string[])[], 
+  desmembreCount: number, 
+  desmembreRows: (string[])[],
+  desmembreRemetenteCount: Record<string, number>
+} {
   const convertWeightValue = (value: string): string => {
     if (!value) return '';
     const cleanedValue = value.replace(/\./g, '').replace(/,/g, '.');
@@ -18,15 +23,34 @@ function processExtractedText(text: string): (string[])[] {
     return finalValue.toString();
   };
 
-  const aoaData: (string[])[] = [
-    ['Seq.', 'Vagão', 'Num. CT-e', 'Tara', 'TU', 'TB', 'Ticket Tara', 'Ticket TU', 'Ticket TB', 'Mercadoria', 'Data Carregamento', 'Nota Fiscal (NF)', 'Chave NFE', 'Data NF', 'Peso Total NF', 'Peso Rateio', 'Remetente NF', 'Destinatário NF']
-  ];
+  const mainHeader = ['Seq.', 'Vagão', 'Num. CT-e', 'Tara', 'TU', 'TB', 'Ticket Tara', 'Ticket TU', 'Ticket TB', 'Mercadoria', 'Data Carregamento', 'Nota Fiscal (NF)', 'Chave NFE', 'Data NF', 'Peso Total NF', 'Peso Rateio', 'Remetente NF', 'Destinatário NF'];
+  const desmembreHeader = ['Vagão', 'TB', 'Chave NFE', 'Remetente NF', 'Data NF', 'Peso Rateio'];
+  const aoaData: (string[])[] = [mainHeader];
+  const desmembreRows: (string[])[] = [desmembreHeader];
+  const desmembreRemetenteCount: Record<string, number> = {};
 
   const recordSplitRegex = /^\s*(?=\d{1,3}\.?\s+[A-Z0-9-]{6,14})/m;
   const records = text.split(recordSplitRegex).filter(r => r.trim() !== '');
 
   const wagonRegex = /^(\d{1,3})\.?\s+([A-Z0-9-]{6,14})\s+(.*)/s;
   const nfBoundaryRegex = /(\S+)\s+([\d\s]{40,60})\s+(\d{2}\s*[/|-]\s*\d{2}\s*[/|-]\s*\d{2,4})/g;
+
+  const wagonCounts = new Map<string, number>();
+  const uniqueDesmembres = new Set<string>();
+
+  for (const record of records) {
+      const wagonMatch = record.match(wagonRegex);
+      if (wagonMatch) {
+          const rawPlate = wagonMatch[2].trim().toUpperCase();
+          const sanitizedPlate = rawPlate.replace(/O/g, '0').replace(/I/g, '1');
+          if ((wagonCounts.get(sanitizedPlate) || 0) > 0) {
+            uniqueDesmembres.add(sanitizedPlate);
+          }
+          wagonCounts.set(sanitizedPlate, (wagonCounts.get(sanitizedPlate) || 0) + 1);
+      }
+  }
+
+  const desmembreCount = uniqueDesmembres.size;
 
   for (const record of records) {
     const wagonMatch = record.match(wagonRegex);
@@ -35,7 +59,18 @@ function processExtractedText(text: string): (string[])[] {
     const seq = wagonMatch[1].trim();
     const rawPlate = wagonMatch[2].trim().toUpperCase();
     const sanitizedPlate = rawPlate.replace(/O/g, '0').replace(/I/g, '1');
-    const restOfRecord = wagonMatch[3] || '';
+    let restOfRecord = wagonMatch[3] || '';
+
+    const isDesmembre = uniqueDesmembres.has(sanitizedPlate);
+    const wagonDisplay = isDesmembre ? `${sanitizedPlate} (Desmembre)` : sanitizedPlate;
+
+    // --- DEFINITIVE UPSTREAM CLEANUP ---
+    const footerTerminator = /Tota(l)?|Qntd|Ticket|Recebemos|Assinatura/i;
+    const footerMatchIndex = restOfRecord.search(footerTerminator);
+    if (footerMatchIndex !== -1) {
+      restOfRecord = restOfRecord.substring(0, footerMatchIndex);
+    }
+    // --- END OF CLEANUP ---
 
     const allNfMatches = [...restOfRecord.matchAll(nfBoundaryRegex)];
     if (allNfMatches.length === 0) continue;
@@ -95,18 +130,7 @@ function processExtractedText(text: string): (string[])[] {
       const numNf = finalNfMatch[1].trim();
       const chaveNfe = finalNfMatch[2].replace(/\s/g, '');
       const dataNf = finalNfMatch[3].replace(/\s/g, '').replace(/-/g, '/');
-      
-      let restOfNfRaw = finalNfMatch[4];
-
-      // DEFINITIVE TOLERANCE-ZERO CLEANUP:
-      // This regex finds the very first word that could belong to the footer.
-      const footerTerminator = /Tota(l)?|Qntd\. Vagões|Ticket|Recebemos este aviso|Assinatura do Agente/i;
-      const footerMatchIndex = restOfNfRaw.search(footerTerminator);
-      
-      // If a footer term is found, cut the string off right there.
-      if (footerMatchIndex !== -1) {
-        restOfNfRaw = restOfNfRaw.substring(0, footerMatchIndex);
-      }
+      const restOfNfRaw = finalNfMatch[4];
 
       const restOfNfLine = restOfNfRaw.trim().split(/\s+/).filter(Boolean);
       
@@ -138,7 +162,7 @@ function processExtractedText(text: string): (string[])[] {
 
       if (isFirstNfForWagon) {
         const completeRow = [
-            seq, sanitizedPlate, numCte, tara, tu, tb, ticketTara, ticketTu, ticketTb, mercadoria, dataCarregamento,
+            seq, wagonDisplay, numCte, tara, tu, tb, ticketTara, ticketTu, ticketTb, mercadoria, dataCarregamento,
             numNf, chaveNfe, dataNf, pesoTotalNf, pesoRateio, remetenteNf, destinatarioNf
         ];
         aoaData.push(completeRow);
@@ -150,16 +174,24 @@ function processExtractedText(text: string): (string[])[] {
         ];
         aoaData.push(partialRow);
       }
+
+      if (isDesmembre) {
+        const desmembreSummaryRow = [wagonDisplay, tb, chaveNfe, remetenteNf, dataNf, pesoRateio];
+        desmembreRows.push(desmembreSummaryRow);
+        if (remetenteNf) {
+          desmembreRemetenteCount[remetenteNf] = (desmembreRemetenteCount[remetenteNf] || 0) + 1;
+        }
+      }
     }
   }
 
-  return aoaData;
+  return { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount };
 }
 
 export async function convertPdf(prevState: any, formData: FormData): Promise<FormState> {
   const file = formData.get('pdf') as File;
   if (!file || file.size === 0) {
-    return { message: 'Nenhum arquivo enviado. Por favor, selecione um PDF.' };
+    return { message: 'Nenhum arquivo enviado. Por favor, selecione um PDF.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {} };
   }
 
   try {
@@ -167,18 +199,28 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
     const data = await pdf(buffer);
 
     if (!data.text || data.text.trim() === ''){
-      return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.' };
+      return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {} };
     }
 
-    const extractedData = processExtractedText(data.text);
+    const { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount } = processExtractedText(data.text);
 
-    if (extractedData.length <= 1) {
-      return { message: 'Não foi possível extrair dados estruturados do PDF. Verifique se o formato do arquivo corresponde ao esperado.' };
+    if (aoaData.length <= 1) {
+      return { 
+        message: 'Não foi possível extrair dados estruturados do PDF. Verifique se o formato do arquivo corresponde ao esperado.',
+        tableData: null,
+        desmembreCount: 0,
+        desmembreRemetenteCount: {}
+      };
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(extractedData);
     const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoaData);
     XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+
+    if (desmembreRows.length > 1) {
+      const wsDesmembre = XLSX.utils.aoa_to_sheet(desmembreRows);
+      XLSX.utils.book_append_sheet(wb, wsDesmembre, 'Desmembres');
+    }
 
     const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
     const base64Data = (excelBuffer as Buffer).toString('base64');
@@ -187,11 +229,19 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
     return {
       message: 'Arquivo processado com sucesso!',
       fileData: base64Data,
-      fileName: outputFileName
+      fileName: outputFileName,
+      tableData: aoaData,
+      desmembreCount: desmembreCount,
+      desmembreRemetenteCount: desmembreRemetenteCount
     };
 
   } catch (error) {
     console.error(error);
-    return { message: 'Ocorreu um erro inesperado no servidor durante o processamento do PDF.' };
+    return { 
+      message: 'Ocorreu um erro inesperado no servidor durante o processamento do PDF.',
+      tableData: null,
+      desmembreCount: 0,
+      desmembreRemetenteCount: {}
+    };
   }
 }

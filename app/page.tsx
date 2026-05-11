@@ -1,166 +1,129 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useFormState } from 'react-dom';
+import { useEffect, useRef, useState } from 'react';
 import { convertPdf } from './actions';
 import type { FormState } from './types';
-import { Upload, Download, RefreshCw, FileSpreadsheet, Sparkles, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-const initialState: FormState = {
-  message: '',
-};
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button 
-      type="submit" 
-      disabled={pending} 
-      className="w-full h-14 text-lg font-semibold rounded-xl bg-primary text-primary-foreground disabled:bg-primary/80 flex items-center justify-center gap-3 transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-100"
-    >
-      {pending ? (
-        <><Loader2 className="w-6 h-6 animate-spin" /> Processando...</>
-      ) : (
-        'Converter para Excel'
-      )}
-    </button>
-  );
+// Função para baixar o arquivo a partir dos dados base64
+function downloadBase64File(base64Data: string, fileName: string) {
+  const linkSource = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64Data}`;
+  const downloadLink = document.createElement('a');
+  downloadLink.href = linkSource;
+  downloadLink.download = fileName;
+  downloadLink.click();
 }
 
-export default function ConverterPage() {
-  const [state, formAction] = useFormState(convertPdf, initialState);
-  const [file, setFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState('Nenhum arquivo selecionado');
-  const [showSuccess, setShowSuccess] = useState(false);
+export default function Home() {
+  const initialState: FormState = { 
+    message: '', 
+    tableData: null, 
+    desmembreCount: 0, 
+    desmembreRemetenteCount: {} 
+  };
+  const [formState, formAction] = useFormState(convertPdf, initialState);
+  const [tableData, setTableData] = useState<(string[])[] | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state.fileData && state.fileName) {
-      const byteCharacters = atob(state.fileData);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = state.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      setShowSuccess(true);
+    if (formState.fileData && formState.fileName) {
+      downloadBase64File(formState.fileData, formState.fileName);
+      // Limpa o formulário após o sucesso
+      formRef.current?.reset(); 
     }
-  }, [state.fileData, state.fileName]);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setFileName(selectedFile.name);
-      setShowSuccess(false); // Reset success state
+    // Atualiza os dados da tabela independentemente do download
+    if (formState.tableData) {
+      setTableData(formState.tableData);
+    } else {
+      // Limpa a tabela se não houver dados (ex: erro ou novo upload)
+      setTableData(null);
     }
-  };
+  }, [formState]);
 
-  const handleReset = () => {
-    setFile(null);
-    setFileName('Nenhum arquivo selecionado');
-    const fileInput = document.getElementById('pdf-upload') as HTMLInputElement;
-    if(fileInput) fileInput.value = '';
-    setShowSuccess(false);
-    // We don't need to reload the page anymore, just reset the client state
-  };
+  const header = tableData ? tableData[0] : [];
+  const body = tableData ? tableData.slice(1) : [];
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800">
-      <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
-          <div className="p-2 rounded-xl bg-blue-100">
-            <FileSpreadsheet className="w-6 h-6 text-blue-600" />
-          </div>
+    <main className="flex min-h-screen flex-col items-center p-12 bg-gray-50">
+      <div className="w-full max-w-4xl bg-white p-8 rounded-lg shadow-md">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Conversor de PDF para Excel</h1>
+        <p className="text-gray-600 mb-6">Faça o upload de um arquivo PDF para extrair os dados em formato de planilha.</p>
+        
+        <form ref={formRef} action={formAction} className="space-y-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Conversor de PDF para Excel</h1>
-            <p className="text-sm text-gray-500">Extração de dados de alta precisão</p>
+            <label htmlFor="pdf" className="block text-sm font-medium text-gray-700 mb-1">Arquivo PDF</label>
+            <input 
+              type="file" 
+              name="pdf" 
+              id="pdf" 
+              accept=".pdf" 
+              required
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+            />
           </div>
-        </div>
-      </header>
+          <button 
+            type="submit" 
+            className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
+          >
+            Converter e Baixar
+          </button>
+        </form>
 
-      <main className="max-w-2xl mx-auto px-6 py-12 md:py-20">
-        <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold mb-4">
-                <Sparkles className="w-4 h-4" />
-                Robusto e Confiável
-            </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tighter mb-4">
-                Envie seu PDF e baixe em Excel
-            </h2>
-            <p className="text-lg text-gray-600 max-w-lg mx-auto">
-                A nova arquitetura de servidor garante conversões estáveis e precisas, eliminando os erros de navegador.
-            </p>
-        </div>
+        {formState.message && (
+          <p className={`mt-4 text-sm ${formState.fileData ? 'text-green-600' : 'text-red-600'}`}>
+            {formState.message}
+          </p>
+        )}
+      </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-8 transition-all duration-500">
-          {!showSuccess ? (
-            <form action={formAction}>
-              <div className="mb-6">
-                <label htmlFor="pdf-upload" className="block text-lg font-semibold text-gray-700 mb-3 text-center">1. Escolha o arquivo PDF</label>
-                <div className="relative">
-                  <input 
-                    type="file" 
-                    name="pdf" 
-                    id="pdf-upload" 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                    onChange={handleFileChange} 
-                    accept=".pdf"
-                    required
-                  />
-                  <div className="w-full h-32 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-500 transition-colors duration-300 hover:border-blue-500 hover:bg-blue-50">
-                    <Upload className="w-8 h-8 mb-2" />
-                    <span className="font-medium text-center px-2">{fileName}</span>
-                  </div>
+      {tableData && body.length > 0 && (
+        <div className="w-full max-w-7xl mt-8">
+            {formState.desmembreCount && formState.desmembreCount > 0 && (
+                <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+                    <h3 className="text-lg font-bold text-blue-800">Resumo de Desmembres</h3>
+                    <p className="text-blue-700 mt-2"><strong>Total de Vagões Desmembrados:</strong> {formState.desmembreCount}</p>
+                    {formState.desmembreRemetenteCount && Object.keys(formState.desmembreRemetenteCount).length > 0 && (
+                        <div className="mt-2">
+                            <p className="font-semibold text-blue-700">Ocorrências por Remetente:</p>
+                            <ul className="list-disc list-inside text-blue-600 mt-1">
+                                {Object.entries(formState.desmembreRemetenteCount).map(([remetente, count]) => (
+                                    <li key={remetente}><strong>{remetente}:</strong> {count} ocorrência(s)</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
-              </div>
-              
-              {file && (
-                <div className="mt-8">
-                  <label className="block text-lg font-semibold text-gray-700 mb-3 text-center">2. Inicie a conversão</label>
-                  <SubmitButton />
-                </div>
-              )}
-            </form>
-          ) : (
-            <div className="text-center space-y-6 py-8">
-              <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto animate-pulse" />
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900">Download Iniciado!</h3>
-                <p className="text-gray-600 mt-1">Seu arquivo Excel foi gerado e o download começou.</p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                  <button 
-                    onClick={handleReset}
-                    className="w-full sm:w-auto h-12 px-8 text-lg font-semibold rounded-xl bg-gray-200 text-gray-700 flex items-center justify-center gap-3 transition-all duration-300 ease-in-out transform hover:bg-gray-300 active:bg-gray-400"
-                  >
-                    <RefreshCw className="w-5 h-5" />
-                    Converter Outro Arquivo
-                  </button>
-              </div>
+            )}
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Dados Extraídos</h2>
+            <div className="overflow-x-auto bg-white rounded-lg shadow-md">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            {header.map((col, index) => (
+                                <th key={index} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                    {col}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {body.map((row, rowIndex) => {
+                            const isDesmembre = row[1]?.includes('(Desmembre)');
+                            return (
+                                <tr key={rowIndex} className={isDesmembre ? 'bg-yellow-100' : ''}>
+                                    {row.map((cell, cellIndex) => (
+                                        <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                            {cell}
+                                        </td>
+                                    ))}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
             </div>
-          )}
-
-          {state.message && !state.fileData && (
-             <div className="mt-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-                <div className="flex items-center">
-                    <AlertTriangle className="h-6 w-6 text-red-600 mr-3" />
-                    <div>
-                        <p className="font-bold text-red-800">Ocorreu um Erro</p>
-                        <p className="text-sm text-red-700">{state.message}</p>
-                    </div>
-                </div>
-            </div>
-          )}
         </div>
-      </main>
-    </div>
+      )}
+    </main>
   );
 }
