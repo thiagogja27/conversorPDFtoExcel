@@ -4,6 +4,7 @@ import { useFormState } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { convertPdf } from './actions';
 import type { FormState } from './types';
+import { FileUpload } from './components/FileUpload';
 
 // Função para baixar o arquivo a partir dos dados base64
 function downloadBase64File(base64Data: string, fileName: string) {
@@ -23,19 +24,14 @@ export default function Home() {
   };
   const [formState, formAction] = useFormState(convertPdf, initialState);
   const [tableData, setTableData] = useState<(string[])[] | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (formState.fileData && formState.fileName) {
       downloadBase64File(formState.fileData, formState.fileName);
-      // Limpa o formulário após o sucesso
-      formRef.current?.reset(); 
     }
-    // Atualiza os dados da tabela independentemente do download
     if (formState.tableData) {
       setTableData(formState.tableData);
     } else {
-      // Limpa a tabela se não houver dados (ex: erro ou novo upload)
       setTableData(null);
     }
   }, [formState]);
@@ -49,25 +45,7 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Conversor de PDF para Excel</h1>
         <p className="text-gray-600 mb-6">Faça o upload de um arquivo PDF para extrair os dados em formato de planilha.</p>
         
-        <form ref={formRef} action={formAction} className="space-y-4">
-          <div>
-            <label htmlFor="pdf" className="block text-sm font-medium text-gray-700 mb-1">Arquivo PDF</label>
-            <input 
-              type="file" 
-              name="pdf" 
-              id="pdf" 
-              accept=".pdf" 
-              required
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-            />
-          </div>
-          <button 
-            type="submit" 
-            className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
-          >
-            Converter e Baixar
-          </button>
-        </form>
+        <FileUpload formAction={formAction} />
 
         {formState.message && (
           <p className={`mt-4 text-sm ${formState.fileData ? 'text-green-600' : 'text-red-600'}`}>
