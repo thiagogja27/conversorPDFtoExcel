@@ -2,40 +2,42 @@
 
 ## Visão Geral
 
-Esta aplicação é uma ferramenta web que permite aos usuários converter arquivos PDF em planilhas do Excel de forma rápida e fácil. O objetivo é fornecer uma interface simples e intuitiva, onde o usuário pode fazer o upload de um arquivo PDF e receber um link para baixar o arquivo Excel convertido.
+Esta aplicação é uma ferramenta web que permite aos usuários converter arquivos PDF de composição de trens em planilhas do Excel. O objetivo é extrair dados complexos de forma estruturada, identificar vagões que necessitam de desmembre e apresentar os resultados de forma clara e interativa tanto na interface web quanto no arquivo Excel gerado.
 
 ## Funcionalidades e Design Implementados
 
-*   **Interface de Upload Simples**: Uma página inicial limpa com um formulário para upload de arquivos PDF.
+*   **Identidade Visual**:
+    *   O logótipo da **TEAG** foi adicionado no canto superior esquerdo da página.
+    *   O logótipo da **Baltech** foi adicionado no canto superior direito da página.
+*   **Interface de Upload Simples**: Uma página inicial limpa com um componente de upload de arrastar e soltar (`drag-and-drop`) para arquivos PDF.
 *   **Conversão no Servidor**: A conversão do PDF é feita inteiramente no servidor usando Server Actions do Next.js.
-*   **Download Direto**: Após o processamento, um link para download do arquivo `.xlsx` gerado é exibido dinamicamente na interface.
-*   **Estilo Moderno**: A aplicação utiliza TailwindCSS para um design moderno e responsivo, com um gradiente de fundo sutil e uma fonte personalizada (Inter).
-*   **Componentes Reativos**: A interface utiliza os hooks `useFormState` e `useFormStatus` do React para fornecer feedback em tempo real durante o processo de upload e conversão (ex: desabilitar o botão, exibir mensagens de erro/sucesso).
-*   **Resumo de Desmembres na Interface**: Após o processamento, a aplicação exibe um resumo claro na interface do usuário, detalhando o número total de vagões desmembrados e a contagem de ocorrências de desmembre para cada remetente (Remetente NF).
+*   **Download Direto do Excel**: Após o processamento, o download do arquivo `.xlsx` é iniciado automaticamente no navegador do usuário.
+*   **Estilo Moderno e Responsivo**: A aplicação utiliza TailwindCSS para um design moderno e responsivo.
 
-### Lógica de Extração de Dados (Motor de Processamento)
+### Funcionalidades de Análise de Dados
 
-O motor de extração de texto em `app/actions.ts` foi reescrito para ser robusto e lidar com as complexidades do formato do PDF de origem. A lógica final implementada inclui:
+1.  **Barra de Pesquisa Global**: Uma barra de pesquisa permite ao usuário filtrar em tempo real os dados em **ambas** as tabelas ("Detalhes dos Desmembres" e "Todos os Dados Extraídos").
 
-1.  **Divisão por Registros**: O texto completo do PDF é dividido em "registros" individuais, onde cada registro corresponde a um vagão.
-2.  **Tratamento de Múltiplas Notas Fiscais (NFs)**: O sistema reconhece que um único vagão pode ter múltiplas NFs. Ele varre o registro do vagão, encontra **todas** as NFs associadas e cria uma linha separada no Excel para cada uma.
-3.  **Extração de Dados do Vagão**: A lógica extrai corretamente a data de carregamento (`DD/MM/AAAA HH:MM:SS`) e os campos numéricos do vagão.
-4.  **Processamento de Todas as Páginas**: A limitação que restringia o processamento a apenas poucas páginas foi removida, garantindo que documentos de qualquer tamanho sejam processados por completo.
-5.  **Limpeza de Dados**: Códigos de vagão são normalizados (ex: 'O' -> '0'), e a chave da NFe é limpa de espaços.
-6.  **Lógica de Extração de NF Robusta (Correção Final)**: Para resolver o problema de dados ausentes ou "amontoados", a lógica agora funciona em duas etapas:
-    *   **a. Identificação de Bloco**: Primeiro, o sistema identifica o bloco de texto completo de cada nota fiscal, mesmo que ela se estenda por várias linhas no PDF.
-    *   **b. Achatamento e Extração**: Em seguida, ele "achata" esse bloco em uma única linha de texto e só então extrai os dados, garantindo que todas as colunas (`Peso Rateio`, `Remetente`, `Destinatário`, etc.) sejam preenchidas corretamente.
-7.  **Formato de Saída Agrupado**: O Excel gerado apresenta os dados do vagão apenas na primeira linha da primeira NF. As NFs subsequentes para o mesmo vagão aparecem nas linhas seguintes com as células de dados do vagão em branco, criando uma visualização limpa e agrupada.
+2.  **Extração de Dados Abrangente**: O motor de extração em `app/actions.ts` processa o texto do PDF para extrair dados detalhados de cada vagão, incluindo múltiplas Notas Fiscais (NFs) por vagão.
 
-## Plano de Implementação da Nova Funcionalidade
+3.  **Identificação de Desmembres**: A lógica analisa o documento para identificar vagões que aparecem múltiplas vezes, marcando-os para desmembre.
 
-*   **Identificação de Vagões Duplicados (Desmembre)**:
-    *   **Análise na Geração de Dados**: Após a extração dos dados do PDF, a lógica principal será modificada para identificar todos os vagões que aparecem mais de uma vez no documento.
-    *   **Marcação "Desmembre"**: Para cada vagão identificado como duplicado, um novo campo ou uma anotação será adicionada aos dados para marcá-lo como "desmembre".
-    *   **Cálculo de Desmembres**: O número total de vagões desmembrados únicos será calculado.
-    *   **Contagem por Remetente**: O sistema contará quantas NFs dentro dos vagões desmembrados pertencem a cada "Remetente NF".
-    *   **Aba Resumo "Desmembres" no Excel**: O arquivo Excel gerado conterá uma nova aba chamada "Desmembres". Esta aba funcionará como um resumo, listando as seguintes colunas para a análise dos vagões duplicados: **Vagão, TB, Chave NFE, Remetente NF, Data NF, e Peso Rateio**.
-    *   **Atualização da Interface**: A interface da aplicação será ajustada para exibir claramente:
-        *   Um **quadro de resumo** acima da tabela de dados, mostrando o total de vagões desmembrados e a contagem de ocorrências por remetente.
-        *   Um **destaque visual** (fundo amarelo) nas linhas da tabela que pertencem a um vagão desmembrado.
+4.  **Resumo de Desmembres na Interface**: Um quadro de resumo é exibido, mostrando o número total de vagões desmembrados e a contagem de ocorrências por Remetente.
 
+5.  **Secção "Detalhes dos Desmembres" na Interface**:
+    *   Uma nova tabela dedicada é renderizada na página se forem encontrados desmembres.
+    *   **Coloração Alternada por Vagão**: As linhas da tabela são coloridas com um fundo alternado (amarelo e azul claro) para cada grupo de vagão, facilitando a visualização.
+
+6.  **Tabela de Dados Completos**: Uma segunda tabela na interface exibe todos os dados extraídos do PDF.
+
+7.  **Geração de Arquivo Excel com Duas Abas**:
+    *   **Aba "Dados"**: Contém a extração completa de todos os dados do PDF.
+    *   **Aba "Desmembres"**: Contém a mesma tabela de resumo de desmembres exibida na interface, para análise offline.
+
+## Estrutura do Projeto
+
+*   **`app/page.tsx`**: Componente principal da interface, contendo os logótipos, os formulários, a barra de pesquisa e as tabelas de resultados.
+*   **`app/actions.ts`**: Server Action que contém toda a lógica de processamento do PDF, extração de dados e geração do arquivo Excel.
+*   **`app/types.ts`**: Define a estrutura de tipos (`FormState`) para a comunicação entre o servidor e o cliente.
+*   **`app/components/FileUpload.tsx`**: Componente reutilizável para a área de upload de arquivos.
+*   **`blueprint.md`**: Este documento, servindo como a fonte da verdade para a arquitetura e funcionalidades da aplicação.

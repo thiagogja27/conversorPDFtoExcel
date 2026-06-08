@@ -174,7 +174,7 @@ function processExtractedText(text: string): {
       aoaData.push(completeRow);
 
       if (isDesmembre) {
-        const desmembreWagonDisplay = `${sanitizedPlate} (Desmembre)`;
+        const desmembreWagonDisplay = `${sanitizedPlate}`;
         const fornecedorCnpj = chaveNfe.length >= 20 ? chaveNfe.substring(6, 20) : '';
         const desmembreSummaryRow = [desmembreWagonDisplay, tb, chaveNfe, remetenteNf, dataNf, pesoRateio, fornecedorCnpj];
         desmembreRows.push(desmembreSummaryRow);
@@ -191,7 +191,7 @@ function processExtractedText(text: string): {
 export async function convertPdf(prevState: any, formData: FormData): Promise<FormState> {
   const file = formData.get('pdf') as File;
   if (!file || file.size === 0) {
-    return { message: 'Nenhum arquivo enviado. Por favor, selecione um PDF.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {} };
+    return { message: 'Nenhum arquivo enviado. Por favor, selecione um PDF.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {}, desmembreRows: null };
   }
 
   try {
@@ -199,7 +199,7 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
     const data = await pdf(buffer);
 
     if (!data.text || data.text.trim() === ''){
-      return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {} };
+      return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {}, desmembreRows: null };
     }
 
     const { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount, prefixo, trainName } = processExtractedText(data.text);
@@ -209,7 +209,8 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
         message: 'Não foi possível extrair dados estruturados do PDF. Verifique se o formato do arquivo corresponde ao esperado.',
         tableData: null,
         desmembreCount: 0,
-        desmembreRemetenteCount: {}
+        desmembreRemetenteCount: {},
+        desmembreRows: null
       };
     }
 
@@ -222,7 +223,7 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
       XLSX.utils.book_append_sheet(wb, wsDesmembre, 'Desmembres');
     }
 
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
     const base64Data = (excelBuffer as Buffer).toString('base64');
     
     const sanitizedTrainName = trainName ? trainName.replace(/[^a-zA-Z0-9-]/g, '_').replace(/\s/g, '-') : null;
@@ -235,7 +236,8 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
       fileName: outputFileName,
       tableData: aoaData,
       desmembreCount: desmembreCount,
-      desmembreRemetenteCount: desmembreRemetenteCount
+      desmembreRemetenteCount: desmembreRemetenteCount,
+      desmembreRows: desmembreRows
     };
 
   } catch (error) {
@@ -244,7 +246,8 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
       message: 'Ocorreu um erro inesperado no servidor durante o processamento do PDF.',
       tableData: null,
       desmembreCount: 0,
-      desmembreRemetenteCount: {}
+      desmembreRemetenteCount: {},
+      desmembreRows: null
     };
   }
 }
