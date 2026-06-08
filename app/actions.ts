@@ -62,7 +62,7 @@ function processExtractedText(text: string): {
     let restOfRecord = wagonMatch[3] || '';
 
     const isDesmembre = uniqueDesmembres.has(sanitizedPlate);
-    const wagonDisplay = isDesmembre ? `${sanitizedPlate} (Desmembre)` : sanitizedPlate;
+    const wagonDisplay = sanitizedPlate; // ADJUSTMENT 1: Remove " (Desmembre)" from main sheet display
 
     // --- DEFINITIVE UPSTREAM CLEANUP ---
     const footerTerminator = /Tota(l)?|Qntd|Ticket|Recebemos|Assinatura/i;
@@ -114,7 +114,6 @@ function processExtractedText(text: string): {
     ticketTu = numberParts[6] || '';
     ticketTb = numberParts[7] || '';
 
-    let isFirstNfForWagon = true;
     const nfParser = /(\S+)\s+([\d\s]{40,60})\s+(\d{2}\s*[/|-]\s*\d{2}\s*[/|-]\s*\d{2,4})\s+(.*)/;
 
     for (let i = 0; i < allNfMatches.length; i++) {
@@ -160,23 +159,17 @@ function processExtractedText(text: string): {
       const remetenteNf = clienteParts.slice(0, mid).join(' ');
       const destinatarioNf = clienteParts.slice(mid).join(' ');
 
-      if (isFirstNfForWagon) {
-        const completeRow = [
-            seq, wagonDisplay, numCte, tara, tu, tb, ticketTara, ticketTu, ticketTb, mercadoria, dataCarregamento,
-            numNf, chaveNfe, dataNf, pesoTotalNf, pesoRateio, remetenteNf, destinatarioNf
-        ];
-        aoaData.push(completeRow);
-        isFirstNfForWagon = false;
-      } else {
-        const partialRow = [
-            '', '', '', '', '', '', '', '', '', '', '',
-            numNf, chaveNfe, dataNf, pesoTotalNf, pesoRateio, remetenteNf, destinatarioNf
-        ];
-        aoaData.push(partialRow);
-      }
+      // ADJUSTMENT 2: Always create a complete row, filling down the data.
+      const completeRow = [
+          seq, wagonDisplay, numCte, tara, tu, tb, ticketTara, ticketTu, ticketTb, mercadoria, dataCarregamento,
+          numNf, chaveNfe, dataNf, pesoTotalNf, pesoRateio, remetenteNf, destinatarioNf
+      ];
+      aoaData.push(completeRow);
 
       if (isDesmembre) {
-        const desmembreSummaryRow = [wagonDisplay, tb, chaveNfe, remetenteNf, dataNf, pesoRateio];
+        // Add " (Desmembre)" only for the Desmembre sheet summary
+        const desmembreWagonDisplay = `${sanitizedPlate} (Desmembre)`;
+        const desmembreSummaryRow = [desmembreWagonDisplay, tb, chaveNfe, remetenteNf, dataNf, pesoRateio];
         desmembreRows.push(desmembreSummaryRow);
         if (remetenteNf) {
           desmembreRemetenteCount[remetenteNf] = (desmembreRemetenteCount[remetenteNf] || 0) + 1;
