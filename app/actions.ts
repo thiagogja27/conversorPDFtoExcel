@@ -24,7 +24,7 @@ function processExtractedText(text: string): {
   };
 
   const mainHeader = ['Seq.', 'Vagão', 'Num. CT-e', 'Tara', 'TU', 'TB', 'Ticket Tara', 'Ticket TU', 'Ticket TB', 'Mercadoria', 'Data Carregamento', 'Nota Fiscal (NF)', 'Chave NFE', 'Data NF', 'Peso Total NF', 'Peso Rateio', 'Remetente NF', 'Destinatário NF'];
-  const desmembreHeader = ['Vagão', 'TB', 'Chave NFE', 'Remetente NF', 'Data NF', 'Peso Rateio'];
+  const desmembreHeader = ['Vagão', 'TB', 'Chave NFE', 'Remetente NF', 'Data NF', 'Peso Rateio', 'FORNECEDOR'];
   const aoaData: (string[])[] = [mainHeader];
   const desmembreRows: (string[])[] = [desmembreHeader];
   const desmembreRemetenteCount: Record<string, number> = {};
@@ -62,15 +62,13 @@ function processExtractedText(text: string): {
     let restOfRecord = wagonMatch[3] || '';
 
     const isDesmembre = uniqueDesmembres.has(sanitizedPlate);
-    const wagonDisplay = sanitizedPlate; // ADJUSTMENT 1: Remove " (Desmembre)" from main sheet display
+    const wagonDisplay = sanitizedPlate;
 
-    // --- DEFINITIVE UPSTREAM CLEANUP ---
     const footerTerminator = /Tota(l)?|Qntd|Ticket|Recebemos|Assinatura/i;
     const footerMatchIndex = restOfRecord.search(footerTerminator);
     if (footerMatchIndex !== -1) {
       restOfRecord = restOfRecord.substring(0, footerMatchIndex);
     }
-    // --- END OF CLEANUP ---
 
     const allNfMatches = [...restOfRecord.matchAll(nfBoundaryRegex)];
     if (allNfMatches.length === 0) continue;
@@ -159,7 +157,6 @@ function processExtractedText(text: string): {
       const remetenteNf = clienteParts.slice(0, mid).join(' ');
       const destinatarioNf = clienteParts.slice(mid).join(' ');
 
-      // ADJUSTMENT 2: Always create a complete row, filling down the data.
       const completeRow = [
           seq, wagonDisplay, numCte, tara, tu, tb, ticketTara, ticketTu, ticketTb, mercadoria, dataCarregamento,
           numNf, chaveNfe, dataNf, pesoTotalNf, pesoRateio, remetenteNf, destinatarioNf
@@ -167,9 +164,9 @@ function processExtractedText(text: string): {
       aoaData.push(completeRow);
 
       if (isDesmembre) {
-        // Add " (Desmembre)" only for the Desmembre sheet summary
         const desmembreWagonDisplay = `${sanitizedPlate} (Desmembre)`;
-        const desmembreSummaryRow = [desmembreWagonDisplay, tb, chaveNfe, remetenteNf, dataNf, pesoRateio];
+        const fornecedorCnpj = chaveNfe.length >= 20 ? chaveNfe.substring(6, 20) : '';
+        const desmembreSummaryRow = [desmembreWagonDisplay, tb, chaveNfe, remetenteNf, dataNf, pesoRateio, fornecedorCnpj];
         desmembreRows.push(desmembreSummaryRow);
         if (remetenteNf) {
           desmembreRemetenteCount[remetenteNf] = (desmembreRemetenteCount[remetenteNf] || 0) + 1;
