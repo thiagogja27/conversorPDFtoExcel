@@ -10,18 +10,28 @@ function processExtractedText(text: string): {
   aoaData: (string[])[], 
   desmembreCount: number, 
   desmembreRows: (string[])[],
-  desmembreRemetenteCount: Record<string, number>
+  desmembreRemetenteCount: Record<string, number>,
+  prefixo: string | null,
+  trainName: string | null
 } {
   const convertWeightValue = (value: string): string => {
     if (!value) return '';
     const cleanedValue = value.replace(/\./g, '').replace(/,/g, '.');
     const number = parseFloat(cleanedValue);
     if (isNaN(number)) {
-      return value; // Return original string if it's not a number
+      return value;
     }
     const finalValue = Math.round(number * 1000);
     return finalValue.toString();
   };
+
+  const prefixoRegex = /Prefixo\s*-\s*OS:\s*([^\n\r]*?)(?:\s{2,}|\n|\r)/;
+  const prefixoMatch = text.match(prefixoRegex);
+  const prefixo = prefixoMatch ? prefixoMatch[1].trim() : null;
+
+  const trainRegex = /(?:Nome do Trem|Trem):\s*([^\n\r]+)/i;
+  const trainMatch = text.match(trainRegex);
+  const trainName = trainMatch ? trainMatch[1].trim() : null;
 
   const mainHeader = ['Seq.', 'Vagão', 'Num. CT-e', 'Tara', 'TU', 'TB', 'Ticket Tara', 'Ticket TU', 'Ticket TB', 'Mercadoria', 'Data Carregamento', 'Nota Fiscal (NF)', 'Chave NFE', 'Data NF', 'Peso Total NF', 'Peso Rateio', 'Remetente NF', 'Destinatário NF'];
   const desmembreHeader = ['Vagão', 'TB', 'Chave NFE', 'Remetente NF', 'Data NF', 'Peso Rateio', 'FORNECEDOR'];
@@ -175,7 +185,7 @@ function processExtractedText(text: string): {
     }
   }
 
-  return { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount };
+  return { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount, prefixo, trainName };
 }
 
 export async function convertPdf(prevState: any, formData: FormData): Promise<FormState> {
@@ -192,7 +202,7 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
       return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {} };
     }
 
-    const { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount } = processExtractedText(data.text);
+    const { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount, prefixo, trainName } = processExtractedText(data.text);
 
     if (aoaData.length <= 1) {
       return { 
@@ -214,7 +224,10 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
 
     const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
     const base64Data = (excelBuffer as Buffer).toString('base64');
-    const outputFileName = `dados-${Date.now()}.xlsx`;
+    
+    const sanitizedTrainName = trainName ? trainName.replace(/[^a-zA-Z0-9-]/g, '_').replace(/\s/g, '-') : null;
+    const sanitizedPrefix = prefixo ? prefixo.replace(/[^a-zA-Z0-9-]/g, '_').replace(/\s/g, '-') : null;
+    const outputFileName = sanitizedTrainName ? `${sanitizedTrainName}.xlsx` : (sanitizedPrefix ? `${sanitizedPrefix}.xlsx` : 'resumo-composicao.xlsx');
 
     return {
       message: 'Arquivo processado com sucesso!',
