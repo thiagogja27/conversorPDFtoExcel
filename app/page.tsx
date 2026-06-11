@@ -26,6 +26,17 @@ export default function Home() {
   };
   const [formState, formAction] = useFormState(convertPdf, initialState);
   const [searchQuery, setSearchQuery] = useState('');
+  const [completedRows, setCompletedRows] = useState<number[]>([]);
+
+  const handleCheckboxChange = (rowIndex: number) => {
+    setCompletedRows(prev => {
+      if (prev.includes(rowIndex)) {
+        return prev.filter(idx => idx !== rowIndex);
+      } else {
+        return [...prev, rowIndex];
+      }
+    });
+  };
 
   useEffect(() => {
     if (formState.fileData && formState.fileName) {
@@ -49,10 +60,10 @@ export default function Home() {
 
   let lastWagonId: string | null = null;
   let colorIndex = 0;
-  const colorClasses = ['bg-yellow-100', 'bg-blue-100'];
+  const colorClasses = ['bg-yellow-100', 'bg-blue-100']; // Cores originais
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center p-12 bg-gray-50">
+    <main className="relative flex min-h-screen flex-col items-center p-6 md:p-12 bg-gray-100 text-gray-800">
       <Image
         src="/teag-logo.png"
         alt="TEAG Logo"
@@ -67,14 +78,14 @@ export default function Home() {
         height={40}
         className="absolute top-6 right-6 md:top-8 md:right-8"
       />
-      <div className="w-full max-w-4xl bg-white p-8 rounded-lg shadow-md mt-16 md:mt-20">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">Conversor de PDF para Excel</h1>
+      <div className="w-full max-w-4xl bg-white p-8 rounded-xl shadow-lg mt-16 md:mt-20 border border-gray-200">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">Conversor de PDF para Excel</h1>
         <p className="text-gray-600 mb-6 text-center">Faça o upload de um arquivo PDF para extrair os dados em formato de planilha.</p>
         
         <FileUpload formAction={formAction} />
 
         {formState.message && (
-          <p className={`mt-4 text-sm ${formState.fileData ? 'text-green-600' : 'text-red-600'} text-center`}>
+          <p className={`mt-4 text-sm ${formState.fileData ? 'text-green-600' : 'text-red-500'} text-center`}>
             {formState.message}
           </p>
         )}
@@ -86,20 +97,20 @@ export default function Home() {
               <input
                 type="text"
                 placeholder="Pesquisar em todas as tabelas..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-500"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
             {formState.desmembreCount && formState.desmembreCount > 0 && (
-                <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-                    <h3 className="text-lg font-bold text-blue-800">Resumo de Desmembres</h3>
-                    <p className="text-blue-700 mt-2"><strong>Total de Vagões Desmembrados:</strong> {formState.desmembreCount}</p>
+                <div className="bg-white p-4 rounded-lg mb-6 border border-indigo-200 shadow-md">
+                    <h3 className="text-lg font-bold text-indigo-700">Resumo de Desmembres</h3>
+                    <p className="text-indigo-600 mt-2"><strong>Total de Vagões Desmembrados:</strong> {formState.desmembreCount}</p>
                     {formState.desmembreRemetenteCount && Object.keys(formState.desmembreRemetenteCount).length > 0 && (
                         <div className="mt-2">
-                            <p className="font-semibold text-blue-700">Ocorrências por Remetente:</p>
-                            <ul className="list-disc list-inside text-blue-600 mt-1">
+                            <p className="font-semibold text-indigo-600">Ocorrências por Remetente:</p>
+                            <ul className="list-disc list-inside text-indigo-700 mt-1">
                                 {Object.entries(formState.desmembreRemetenteCount).map(([remetente, count]) => (
                                     <li key={remetente}><strong>{remetente}:</strong> {count} ocorrência(s)</li>
                                 ))}
@@ -112,16 +123,17 @@ export default function Home() {
             {desmembreBody.length > 0 && (
               <div className="mt-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Detalhes dos Desmembres</h2>
-                <div className="overflow-x-auto bg-white rounded-lg shadow-md">
+                <div className="overflow-x-auto bg-white rounded-lg shadow-lg border border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Concluído</th>
                         {desmembreHeader.map((col, index) => (
-                          <th key={index} className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider whitespace-nowrap">{col}</th>
+                          <th key={index} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{col}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="divide-y divide-gray-200">
                       {filteredDesmembreBody.length > 0 ? (
                         filteredDesmembreBody.map((row, rowIndex) => {
                           const currentWagonId = row[0];
@@ -129,19 +141,29 @@ export default function Home() {
                             if(rowIndex > 0) colorIndex = 1 - colorIndex;
                             lastWagonId = currentWagonId;
                           }
-                          const rowClassName = colorClasses[colorIndex];
+                          
+                          const isCompleted = completedRows.includes(rowIndex);
+                          const rowClassName = isCompleted ? 'bg-green-100' : colorClasses[colorIndex];
 
                           return (
                             <tr key={rowIndex} className={rowClassName}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <input
+                                        type="checkbox"
+                                        checked={isCompleted}
+                                        onChange={() => handleCheckboxChange(rowIndex)}
+                                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                </td>
                               {row.map((cell, cellIndex) => (
-                                <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{cell}</td>
+                                <td key={cellIndex} className={`px-6 py-4 whitespace-nowrap text-sm ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-700'}`}>{cell}</td>
                               ))}
                             </tr>
                           );
                         })
                       ) : (
                         <tr>
-                          <td colSpan={desmembreHeader.length} className="text-center py-4 text-gray-500">Nenhum resultado encontrado para a sua pesquisa.</td>
+                          <td colSpan={desmembreHeader.length + 1} className="text-center py-4 text-gray-500">Nenhum resultado encontrado para a sua pesquisa.</td>
                         </tr>
                       )}
                     </tbody>
@@ -153,7 +175,7 @@ export default function Home() {
             {mainTableBody.length > 0 && (
               <div className="mt-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Todos os Dados Extraídos</h2>
-                <div className="overflow-x-auto bg-white rounded-lg shadow-md">
+                <div className="overflow-x-auto bg-white rounded-lg shadow-lg border border-gray-200">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
@@ -162,10 +184,10 @@ export default function Home() {
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="divide-y divide-gray-200">
                           {filteredMainBody.length > 0 ? (
                             filteredMainBody.map((row, rowIndex) => (
-                                <tr key={rowIndex}>
+                                <tr key={rowIndex} className="hover:bg-gray-50">
                                     {row.map((cell, cellIndex) => (
                                         <td key={cellIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{cell}</td>
                                     ))}
