@@ -34,7 +34,7 @@ function processExtractedText(text: string): {
   const trainName = trainMatch ? trainMatch[1].trim() : null;
 
   const mainHeader = ['Seq.', 'Vagão', 'Num. CT-e', 'Tara', 'TU', 'TB', 'Ticket Tara', 'Ticket TU', 'Ticket TB', 'Mercadoria', 'Data Carregamento', 'Nota Fiscal (NF)', 'Chave NFE', 'Data NF', 'Peso Total NF', 'Peso Rateio', 'Remetente NF', 'Destinatário NF'];
-  const desmembreHeader = ['Vagão', 'TB', 'Chave NFE', 'Remetente NF', 'Data NF', 'Peso Rateio', 'FORNECEDOR'];
+  const desmembreHeader = ['Vagão', 'TB', 'Chave NFE', 'Remetente NF', 'Data NF', 'Peso Rateio', 'Exportador'];
   const aoaData: (string[])[] = [mainHeader];
   const desmembreRows: (string[])[] = [desmembreHeader];
   const desmembreRemetenteCount: Record<string, number> = {};
