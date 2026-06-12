@@ -92,7 +92,7 @@ export default function Home() {
       </div>
 
       {formState.tableData && (
-        <div className="w-full max-w-7xl mt-8">
+        <div className="w-full mt-8">
             <div className="mb-6">
               <input
                 type="text"
