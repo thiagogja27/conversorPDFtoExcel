@@ -11,6 +11,7 @@ function processExtractedText(text: string): {
   desmembreCount: number, 
   desmembreRows: (string[])[],
   desmembreRemetenteCount: Record<string, number>,
+  cnpjData: (string[])[],
   prefixo: string | null,
   trainName: string | null
 } {
@@ -35,8 +36,11 @@ function processExtractedText(text: string): {
 
   const mainHeader = ['Seq.', 'Vagão', 'Num. CT-e', 'Tara', 'TU', 'TB', 'Ticket Tara', 'Ticket TU', 'Ticket TB', 'Mercadoria', 'Data Carregamento', 'Nota Fiscal (NF)', 'Chave NFE', 'Data NF', 'Peso Total NF', 'Peso Rateio', 'Remetente NF', 'Destinatário NF'];
   const desmembreHeader = ['Vagão', 'TB', 'Chave NFE', 'Remetente NF', 'Data NF', 'Peso Rateio', 'Exportador'];
+  const cnpjHeader = ['Vagão', 'CNPJ Remetente'];
+  
   const aoaData: (string[])[] = [mainHeader];
   const desmembreRows: (string[])[] = [desmembreHeader];
+  const cnpjData: (string[])[] = [cnpjHeader];
   const desmembreRemetenteCount: Record<string, number> = {};
 
   const recordSplitRegex = /^\s*(?=\d{1,3}\.?\s+[A-Z0-9-]{6,14})/m;
@@ -139,6 +143,9 @@ function processExtractedText(text: string): {
       const dataNf = finalNfMatch[3].replace(/\s/g, '').replace(/-/g, '/');
       const restOfNfRaw = finalNfMatch[4];
 
+      const cnpjRemetente = chaveNfe.length >= 20 ? chaveNfe.substring(6, 20) : '';
+      cnpjData.push([wagonDisplay, cnpjRemetente]);
+
       const restOfNfLine = restOfNfRaw.trim().split(/\s+/).filter(Boolean);
       
       let pesoTotalNf = '';
@@ -185,7 +192,7 @@ function processExtractedText(text: string): {
     }
   }
 
-  return { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount, prefixo, trainName };
+  return { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount, cnpjData, prefixo, trainName };
 }
 
 export async function convertPdf(prevState: any, formData: FormData): Promise<FormState> {
@@ -202,7 +209,7 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
       return { message: 'O PDF parece estar vazio ou contém apenas imagens. Não foi possível encontrar texto.', tableData: null, desmembreCount: 0, desmembreRemetenteCount: {}, desmembreRows: null };
     }
 
-    const { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount, prefixo, trainName } = processExtractedText(data.text);
+    const { aoaData, desmembreCount, desmembreRows, desmembreRemetenteCount, cnpjData, prefixo, trainName } = processExtractedText(data.text);
 
     if (aoaData.length <= 1) {
       return { 
@@ -221,6 +228,11 @@ export async function convertPdf(prevState: any, formData: FormData): Promise<Fo
     if (desmembreRows.length > 1) {
       const wsDesmembre = XLSX.utils.aoa_to_sheet(desmembreRows);
       XLSX.utils.book_append_sheet(wb, wsDesmembre, 'Desmembres');
+    }
+
+    if (cnpjData.length > 1) {
+      const wsCnpj = XLSX.utils.aoa_to_sheet(cnpjData);
+      XLSX.utils.book_append_sheet(wb, wsCnpj, 'CNPJ');
     }
 
     const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
